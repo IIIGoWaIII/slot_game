@@ -1,0 +1,5 @@
+repo to push to: https://github.com/IIIGoWaIII/slot_game
+
+add info that it's a fork of this one: https://github.com/Akash-Gher/MYSTICAL-FOREST-ADVENTURE
+
+it's meant for me to create custom sprites to show that i can do the artworks to slot games. it's proof that i'm capable
