@@ -4,6 +4,9 @@ const app = new PIXI.Application({
   width: 1270,
   height: 720,
   backgroundColor: 0x1099bb,
+  antialias: true,
+  autoDensity: true,
+  resolution: window.devicePixelRatio || 1,
 });
 
 globalThis.__PIXI_APP__ = app;
@@ -106,21 +109,30 @@ function initPreloader() {
 
 function showEnterPrompt(preloaderContainer, rootContainer) {
   const enterText = new PIXI.Text("Click to Enter Game", {
-    fontFamily: "Arial",
-    fontSize: 24,
-    fill: 0xffffff,
+    fontFamily: "Trebuchet MS",
+    fontSize: 32,
+    fontWeight: "bold",
+    fill: 0xfff2a8,
     align: "center",
+    stroke: 0x3a1600,
+    strokeThickness: 5,
+    dropShadow: true,
+    dropShadowColor: 0x000000,
+    dropShadowBlur: 6,
+    dropShadowDistance: 2,
   });
-  enterText.x = app.screen.width / 2 - enterText.width / 2;
+  enterText.anchor.set(0.5);
+  enterText.resolution = window.devicePixelRatio || 1;
+  enterText.x = app.screen.width / 2;
   enterText.y = app.screen.height / 2 + 200;
   enterText.name = "continueText";
   preloaderContainer.addChild(enterText);
 
   // Apply pulsing animation using GSAP
   gsap.to(enterText.scale, {
-    x: 1.2, // Scale to 1.2 times
-    y: 1.2, // Scale to 1.2 times
-    duration: 0.5, // Duration of each pulse
+    x: 1.08, // Scale to 1.08 times
+    y: 1.08, // Scale to 1.08 times
+    duration: 0.8, // Duration of each pulse
     repeat: -1, // Repeat indefinitely
     yoyo: true, // Reverse back to original scale
     ease: "power2.inOut", // Ease function
@@ -156,8 +168,8 @@ function createControlPanel(container, reels) {
   controlPanelContainer.addChild(balanceFrame);
 
   const balanceLabel = new PIXI.Sprite(PIXI.Texture.from("Balance_Text.png"));
-  balanceLabel.x = balanceFrame.x + 20;
-  balanceLabel.y = balanceFrame.y + 10;
+  balanceLabel.x = 20;
+  balanceLabel.y = 10;
   balanceLabel.name = "balanceLabel";
   balanceFrame.addChild(balanceLabel);
 
@@ -182,8 +194,8 @@ function createControlPanel(container, reels) {
   controlPanelContainer.addChild(winFrame);
 
   const winLabel = new PIXI.Sprite(PIXI.Texture.from("Win_Text.png"));
-  winLabel.x = 0;
-  winLabel.y =  winFrame.y + 10;
+  winLabel.x = 20;
+  winLabel.y = 10;
   winLabel.name = "winLabel";
   winFrame.addChild(winLabel);
 
@@ -208,7 +220,7 @@ function createControlPanel(container, reels) {
 
   const betLabel = new PIXI.Sprite(PIXI.Texture.from("Bet_Text.png"));
   betLabel.x = 20;
-  betLabel.y =  betFrame.y + 10 ;
+  betLabel.y = 10;
   betLabel.name = "betLabel";
   betFrame.addChild(betLabel);
 
@@ -364,67 +376,317 @@ infoButton.y = 20;
 infoButton.scale.set(0.5);
 controlPanelContainer.addChild(infoButton);
 
-// Create modal popup
-const modalContainer = new PIXI.Container();
-modalContainer.name="modalContainer";
-modalContainer.visible = false; 
-modalContainer.x = 0;
-modalContainer.y = 0;
+  const paylinePatterns = [
+    [1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0],
+    [2, 2, 2, 2, 2],
+    [0, 1, 2, 1, 0],
+    [2, 1, 0, 1, 2],
+    [1, 0, 0, 0, 1],
+    [1, 2, 2, 2, 1],
+    [0, 0, 1, 2, 2],
+    [2, 2, 1, 0, 0],
+    [1, 2, 1, 0, 1],
+    [1, 0, 1, 2, 1],
+    [0, 1, 1, 1, 0],
+    [2, 1, 1, 1, 2],
+    [0, 1, 0, 1, 0],
+    [2, 1, 2, 1, 2],
+    [1, 1, 0, 1, 1],
+    [1, 1, 2, 1, 1],
+    [0, 0, 2, 0, 0],
+    [2, 2, 0, 2, 2],
+    [0, 2, 1, 2, 0],
+  ];
+  const paytablePages = [];
+  let paytablePageIndex = 0;
 
-// Blanket to cover the entire screen
-const blanket = new PIXI.Graphics();
-blanket.beginFill(0x000000, 0.8);
-blanket.drawRect(0, 0, 1920, 1080); 
-blanket.endFill();
-blanket.name = "blanket";
-modalContainer.addChild(blanket);
+  // Create modal popup
+  const modalContainer = new PIXI.Container();
+  modalContainer.name = "modalContainer";
+  modalContainer.visible = false;
+  modalContainer.x = 0;
+  modalContainer.y = 0;
 
-// Add reel frame sprite in the modal
-const reelFrame = new PIXI.Sprite(PIXI.Texture.from("reelFrame.png"));
-reelFrame.x = 229; 
-reelFrame.y = 125;
-reelFrame.scale.set(0.5); 
-reelFrame.name = "modalpopupFrame";
-modalContainer.addChild(reelFrame);
+  const blanket = new PIXI.Graphics();
+  blanket.beginFill(0x000000, 0.82);
+  blanket.drawRect(0, 0, app.screen.width, app.screen.height);
+  blanket.endFill();
+  blanket.name = "blanket";
+  modalContainer.addChild(blanket);
 
-const popupTitle = new PIXI.Text(`PAYTABLE`, {
+  const modalFrame = new PIXI.Sprite(PIXI.Texture.from("reelFrame.png"));
+  modalFrame.scale.set(0.56, 0.56);
+  modalFrame.x = (app.screen.width - modalFrame.width) / 2;
+  modalFrame.y = 74;
+  modalFrame.name = "modalpopupFrame";
+  modalContainer.addChild(modalFrame);
+  const paytableBounds = {
+    x: 145,
+    y: 70,
+    width: modalFrame.width - 290,
+    height: modalFrame.height - 155,
+  };
+
+  const contentContainer = new PIXI.Container();
+  contentContainer.name = "PaytableContent";
+  modalContainer.addChild(contentContainer);
+
+  const pageLabel = new PIXI.Text("", {
     fontFamily: "Arial",
-    fontSize: 50,
-    fill: 0xFFD700,
+    fontSize: 22,
+    fontWeight: "bold",
+    fill: 0xffffff,
     align: "center",
-    weight:800
   });
-  popupTitle.x = reelFrame.x  + 300;
-  popupTitle.y =reelFrame.y + 20
-  modalContainer.addChild(popupTitle);
+  pageLabel.anchor.set(0.5);
+  pageLabel.x = app.screen.width / 2;
+  pageLabel.y = modalFrame.y + modalFrame.height - 58;
+  modalContainer.addChild(pageLabel);
 
-// Add close button to the reel frame
-const closeButton = new PIXI.Sprite(PIXI.Texture.from("Stop_Idle.png")); // Ensure you have this texture
-closeButton.name = "CloseButton";
-closeButton.interactive = true;
-closeButton.buttonMode = true;
-closeButton.x = reelFrame.width + 700; 
-closeButton.y = 0; 
-closeButton.scale.set(0.5); 
-reelFrame.addChild(closeButton);
+  function createPaytableText(text, size, fill = 0xffffff, weight = "bold") {
+    return new PIXI.Text(text, {
+      fontFamily: "Trebuchet MS",
+      fontSize: size,
+      fontWeight: weight,
+      fill,
+      align: "center",
+      stroke: 0x1b0a00,
+      strokeThickness: size >= 26 ? 4 : 2,
+    });
+  }
 
-// Add close button interaction handlers
-closeButton.on('pointerover', () => {
-    closeButton.tint = 0xaaaaaa; 
-});
+  function createPanel(x, y, width, height) {
+    const panel = new PIXI.Container();
+    panel.x = x;
+    panel.y = y;
 
-closeButton.on('pointerout', () => {
-    closeButton.tint = 0xffffff;
-});
+    const background = new PIXI.Graphics();
+    background.beginFill(0x09031c, 0.88);
+    background.lineStyle(2, 0xf4bd42, 0.75);
+    background.drawRoundedRect(0, 0, width, height, 8);
+    background.endFill();
+    panel.addChild(background);
 
-closeButton.on('pointerdown', () => {
-    closeButton.tint = 0x888888; 
-    modalContainer.visible = false; 
-});
+    return panel;
+  }
 
-closeButton.on('pointerup', () => {
-    closeButton.tint = 0xffffff; 
-});
+  function addTitle(page, text) {
+    const title = createPaytableText(text, 36, 0xffd94f);
+    title.anchor.set(0.5, 0);
+    title.x = paytableBounds.x + paytableBounds.width / 2;
+    title.y = 18;
+    page.addChild(title);
+  }
+
+  function addBodyText(page, text, x, y, width, size = 18) {
+    const body = new PIXI.Text(text, {
+      fontFamily: "Trebuchet MS",
+      fontSize: size,
+      fill: 0xffffff,
+      align: "center",
+      wordWrap: true,
+      wordWrapWidth: width,
+      lineHeight: size + 8,
+    });
+    body.anchor.set(0.5, 0);
+    body.x = x;
+    body.y = y;
+    page.addChild(body);
+  }
+
+  function addSymbolCard(page, symbolIndex, label, payout, x, y) {
+    const card = createPanel(x, y, 150, 176);
+    page.addChild(card);
+
+    const symbol = PIXI.Sprite.from(`symbol${symbolIndex}`);
+    symbol.anchor.set(0.5);
+    symbol.width = 92;
+    symbol.height = 92;
+    symbol.x = 75;
+    symbol.y = 62;
+    card.addChild(symbol);
+
+    const labelText = createPaytableText(label, 17, 0xffe7a6);
+    labelText.anchor.set(0.5);
+    labelText.x = 75;
+    labelText.y = 122;
+    card.addChild(labelText);
+
+    const payoutText = createPaytableText(payout, payout.length > 20 ? 13 : 17, 0xffffff);
+    payoutText.anchor.set(0.5);
+    payoutText.x = 75;
+    payoutText.y = 150;
+    card.addChild(payoutText);
+  }
+
+  function addPaylinePattern(page, index, pattern, x, y) {
+    const label = createPaytableText(String(index + 1), 18, 0xffffff);
+    label.anchor.set(1, 0.5);
+    label.x = x - 8;
+    label.y = y + 24;
+    page.addChild(label);
+
+    const cell = 12;
+    const gap = 2;
+    for (let col = 0; col < NUM_REELS; col++) {
+      for (let row = 0; row < NUM_ROWS; row++) {
+        const square = new PIXI.Graphics();
+        square.beginFill(pattern[col] === row ? 0xff404d : 0x555766);
+        square.drawRect(x + col * (cell + gap), y + row * (cell + gap), cell, cell);
+        square.endFill();
+        page.addChild(square);
+      }
+    }
+  }
+
+  function createOverviewPage() {
+    const page = new PIXI.Container();
+    addTitle(page, "PAYTABLE");
+    addBodyText(page, "Wins pay left to right on 20 fixed paylines. Highest win only per line.", paytableBounds.x + paytableBounds.width / 2, 70, paytableBounds.width, 18);
+
+    addSymbolCard(page, 11, "WILD", "Substitutes", paytableBounds.x + 35, 128);
+    addSymbolCard(page, 10, "SCATTER", "Free Spins", paytableBounds.x + 225, 128);
+    addSymbolCard(page, 9, "5X", "Multiplier", paytableBounds.x + 415, 128);
+
+    addBodyText(page, "Land 3 or more scatters to trigger free spins. Wild symbols replace regular symbols in line wins.", paytableBounds.x + paytableBounds.width / 2, 342, paytableBounds.width, 20);
+    return page;
+  }
+
+  function createSymbolPage(title, symbols, startY) {
+    const page = new PIXI.Container();
+    addTitle(page, title);
+    symbols.forEach((symbol, index) => {
+      const col = index % 4;
+      const row = Math.floor(index / 4);
+      addSymbolCard(page, symbol.index, symbol.label, symbol.payout, paytableBounds.x + 5 + col * 160, startY + row * 192);
+    });
+    return page;
+  }
+
+  function createPaylinesPage() {
+    const page = new PIXI.Container();
+    addTitle(page, "PAYLINES");
+    paylinePatterns.forEach((pattern, index) => {
+      const col = index % 5;
+      const row = Math.floor(index / 5);
+      addPaylinePattern(page, index, pattern, paytableBounds.x + 50 + col * 112, 105 + row * 76);
+    });
+    addBodyText(page, "Red cells show winning route across five reels.", paytableBounds.x + paytableBounds.width / 2, 408, paytableBounds.width, 18);
+    return page;
+  }
+
+  paytablePages.push(
+    createOverviewPage(),
+    createSymbolPage("HIGH SYMBOLS", [
+      { index: 0, label: "FOREST", payout: "5: 500  4: 100  3: 25" },
+      { index: 1, label: "MUSHROOM", payout: "5: 300  4: 80  3: 20" },
+      { index: 2, label: "DEER", payout: "5: 250  4: 60  3: 15" },
+      { index: 3, label: "OWL", payout: "5: 200  4: 50  3: 12" },
+      { index: 4, label: "SQUIRREL", payout: "5: 150  4: 40  3: 10" },
+      { index: 5, label: "A", payout: "5: 100  4: 30  3: 8" },
+      { index: 6, label: "K", payout: "5: 80  4: 25  3: 6" },
+      { index: 7, label: "Q", payout: "5: 60  4: 20  3: 5" },
+    ], 78),
+    createSymbolPage("LOW SYMBOLS", [
+      { index: 8, label: "J", payout: "5: 50  4: 15  3: 4" },
+      { index: 9, label: "10", payout: "5: 40  4: 12  3: 3" },
+      { index: 10, label: "SCATTER", payout: "Triggers free spins" },
+      { index: 11, label: "WILD", payout: "Replaces symbols" },
+    ], 122),
+    createPaylinesPage()
+  );
+
+  paytablePages.forEach((page) => {
+    page.scale.set(0.85);
+    page.x = modalFrame.x + modalFrame.width * 0.075;
+    page.y = modalFrame.y + 72;
+    page.visible = false;
+    contentContainer.addChild(page);
+  });
+
+  function layoutPaytablePage() {
+    paytablePages.forEach((page, index) => {
+      page.visible = index === paytablePageIndex;
+    });
+    pageLabel.text = `${paytablePageIndex + 1} / ${paytablePages.length}`;
+  }
+
+  function createModalButton(label, x, y, width, height, onClick) {
+    const button = new PIXI.Container();
+    button.interactive = true;
+    button.buttonMode = true;
+    button.x = x;
+    button.y = y;
+
+    const background = new PIXI.Graphics();
+    background.beginFill(0x221307, 0.95);
+    background.lineStyle(2, 0xffd700, 0.85);
+    background.drawRoundedRect(0, 0, width, height, 8);
+    background.endFill();
+    button.addChild(background);
+
+    const text = new PIXI.Text(label, {
+      fontFamily: "Arial",
+      fontSize: height > 48 ? 32 : 24,
+      fontWeight: "bold",
+      fill: 0xffffff,
+      align: "center",
+    });
+    text.anchor.set(0.5);
+    text.x = width / 2;
+    text.y = height / 2;
+    button.addChild(text);
+
+    button.on("pointerover", () => {
+      background.tint = 0xdddddd;
+    });
+    button.on("pointerout", () => {
+      background.tint = 0xffffff;
+    });
+    button.on("pointerdown", onClick);
+
+    modalContainer.addChild(button);
+    return button;
+  }
+
+  const closeButton = createModalButton(
+    "X",
+    modalFrame.x + modalFrame.width - 82,
+    modalFrame.y + 26,
+    46,
+    42,
+    () => {
+      modalContainer.visible = false;
+    }
+  );
+  closeButton.name = "CloseButton";
+
+  createModalButton(
+    "<",
+    modalFrame.x + 50,
+    modalFrame.y + modalFrame.height - 86,
+    58,
+    50,
+    () => {
+      paytablePageIndex = (paytablePageIndex - 1 + paytablePages.length) % paytablePages.length;
+      layoutPaytablePage();
+    }
+  );
+
+  createModalButton(
+    ">",
+    modalFrame.x + modalFrame.width - 108,
+    modalFrame.y + modalFrame.height - 86,
+    58,
+    50,
+    () => {
+      paytablePageIndex = (paytablePageIndex + 1) % paytablePages.length;
+      layoutPaytablePage();
+    }
+  );
+
+  layoutPaytablePage();
 
 // Toggle modal visibility
 function toggleModal() {
@@ -546,33 +808,31 @@ function createReels(container) {
   bottomFrame.name = "tickerPanel";
   reelContainer.addChild(bottomFrame);
 
-  // Define a text style for the ticker message
-  const tickerTextStyle = new PIXI.TextStyle({
-    fontFamily: "Arial", 
-    fontSize: 24, 
-    fontWeight: "bold",
-    fill: "#ffffff",
-    align: "center",
-    dropShadowBlur: 4,
-  });
-
-  // Create the ticker message
-  const tickerMessage = new PIXI.Text("Good Luck!", tickerTextStyle);
-
-  // Position the ticker message inside the bottomFrame
-  tickerMessage.anchor.set(0.5); 
-  tickerMessage.x = 200;
-  tickerMessage.y = 50; 
-
-  // Add the ticker message to the reelContainer or bottomFrame
-  bottomFrame.addChild(tickerMessage);
-
   const reels = [];
   const totalReelWidth = NUM_REELS * REEL_WIDTH + (NUM_REELS - 1) * 10;
 
   // Center reelContainer based on the screen dimensions and reelFrame position
   reelContainer.x = (app.screen.width - totalReelWidth) / 2;
   reelContainer.y = reelFrame.y - reelFrame.height / 4;
+
+  const tickerMessage = new PIXI.Text("Good Luck!", {
+    fontFamily: "Trebuchet MS",
+    fontSize: 25,
+    fontWeight: "bold",
+    fill: 0xfff2b0,
+    align: "center",
+    stroke: 0x2a1200,
+    strokeThickness: 4,
+    dropShadow: true,
+    dropShadowColor: 0x000000,
+    dropShadowBlur: 4,
+    dropShadowDistance: 2,
+  });
+  tickerMessage.anchor.set(0.5);
+  tickerMessage.x = app.screen.width / 2 - reelContainer.x;
+  tickerMessage.y = 616 - reelContainer.y;
+  tickerMessage.name = "TickerMessage";
+  reelContainer.addChild(tickerMessage);
 
   // Create reelStripContainer to wrap all reels
   const reelStripContainer = new PIXI.Container();
@@ -581,6 +841,14 @@ function createReels(container) {
   reelStripContainer.y = 242;
 
   reelContainer.addChild(reelStripContainer);
+
+  const reelMask = new PIXI.Graphics();
+  reelMask.beginFill(0xffffff);
+  reelMask.drawRect(reelStripContainer.x - 20, reelStripContainer.y - 20, 750, NUM_ROWS * SYMBOL_SIZE + 35);
+  reelMask.endFill();
+  reelMask.name = "ReelMask";
+  reelContainer.addChild(reelMask);
+  reelStripContainer.mask = reelMask;
 
   for (let i = 0; i < NUM_REELS; i++) {
     const reel = new PIXI.Container();
@@ -613,7 +881,7 @@ function spinReels(reels) {
     return new Promise((resolve) => {
         spinSound.play();
 
-        const spinSpeed = 10;
+        const spinSpeed = 18;
         const stopDelay = 0.2;
         let finishedReelsCount = 0;
         const gsapTweens = [];
@@ -647,21 +915,26 @@ function spinReels(reels) {
 
                 reelStopSound.play();
 
-                gsap.to(reel, {
-                    duration: 1.0,
-                    ease: "power1.out",
-                    onComplete: () => {
-                        finishedReelsCount++;
+                let settledSymbols = 0;
+                reel.children.forEach((symbol, symbolIndex) => {
+                    gsap.to(symbol, {
+                        y: originalPositions[reelIndex][symbolIndex],
+                        duration: 0.22,
+                        ease: "power2.out",
+                        onComplete: () => {
+                            settledSymbols++;
+                            if (settledSymbols !== reel.children.length) {
+                                return;
+                            }
 
-                        reel.children.forEach((symbol, symbolIndex) => {
-                            symbol.y = originalPositions[reelIndex][symbolIndex];
-                        });
+                        finishedReelsCount++;
 
                         if (finishedReelsCount === reels.length) {
                             bonusSound.play();
                             resolve();
                         }
-                    }
+                        },
+                    });
                 });
             });
         }
